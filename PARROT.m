@@ -1,15 +1,15 @@
-function [solutionSTR, solStatus] = PARROT(modelREF, modelSTR, MinStr, lambda, etotREF, etotSTR)
-% Calculates the enzyme usage distribution of a sub-optimal
-% growth condition given a known reference in an optimal condition.
+function [solutionALT, solStatus] = PARROT(modelREF, modelALT, MinStr, lambda, etotREF, etotALT)
+% Calculates the enzyme usage distribution of an alternative
+% growth condition given a known reference in a reference condition.
 %
 % USAGE:
 %
-%    [solutionSTR, solStatus] = PARROT(modelREF, modelSTR, MinStr, lambda, etotREF, etotSTR)
+%    [solutionALT, solStatus] = PARROT(modelREF, modelALT, MinStr, lambda, etotREF, etotALT)
 %
 % INPUTS:
 %    modelREF:          Protein-constrained model with integrated protein
 %                       measurements to be used as a reference condition.
-%    modelSTR:          Protein-constrained model, batch version.
+%    modelALT:          Protein-constrained model, batch version.
 %
 % OPTIONAL INPUTS:
 %    MinStr:            Minimization strategy, 'Euclidean' or 'Manhattan'.
@@ -18,11 +18,11 @@ function [solutionSTR, solStatus] = PARROT(modelREF, modelSTR, MinStr, lambda, e
 %                       rational and positive value. (Default = 0)
 %    etotREF:           Total enzyme usage for the reference condition
 %                       (calculated from ptot * sigma * f) (Default = 0.5)
-%    etotSTR:           Total enzyme usage for the suboptimal condition
+%    etotALT:           Total enzyme usage for the alternative condition
 %                       (calculated from ptot * sigma * f) (Default = 0.5)
 %
 % OUTPUTS:
-%    solutionSTR:       Enzyme usage distribution for sub-optimal condition
+%    solutionALT:       Enzyme usage distribution for alternative condition
 %    solStatus:         Solution status
 %
 % NOTE: Code partially adapted from the COBRA Toolbox function MOMA.m 
@@ -43,7 +43,7 @@ if (nargin<5)
 end
 
 if (nargin<6)
-    etotSTR = 0.5;
+    etotALT = 0.5;
 end
 
 if lambda < 0
@@ -88,7 +88,7 @@ end
 if MinStr == "Euclidean"
     % Construct the QP problem to find Es
     [~,nRxnsREF] = size(modelREF.S);
-    [~,nRxnsSTR] = size(modelSTR.S);
+    [~,nRxnsALT] = size(modelALT.S);
     enzymeIds = find(~cellfun('isempty',strfind(modelREF.rxnNames,'prot_'))); 
     [enzymeNum,~] = size(enzymeIds);
     rxnIds = find(~cellfun('isempty',modelREF.rxns(1:min(enzymeIds)-1)));
@@ -100,7 +100,7 @@ if MinStr == "Euclidean"
     etotShare = modelREF.ub(nRxnsREF)/infNum;
     modelREF.ub(infBoundsProt) = etotShare;
     
-    QPproblem = buildLPproblemFromModel(modelSTR);
+    QPproblem = buildLPproblemFromModel(modelALT);
     
     if lambda > 0
         QPproblem.c(rxnIds) = NormMinSol.full(rxnIds);
@@ -109,19 +109,19 @@ if MinStr == "Euclidean"
         QPproblem.c(enzymeIds) = -2*QPproblem.c(enzymeIds);
         
         QPproblem.F = sparse(size(QPproblem.A,2));
-        QPproblem.F(1:nRxnsSTR,1:nRxnsSTR) = 2*lambda*speye(nRxnsSTR);
+        QPproblem.F(1:nRxnsALT,1:nRxnsALT) = 2*lambda*speye(nRxnsALT);
         QPproblem.F(min(enzymeIds):max(enzymeIds),min(enzymeIds):max(enzymeIds)) = 2*eye(enzymeNum);
         
         QPproblem.osense = 1;
     else
-        QPproblem.c = zeros(nRxnsSTR,1);
+        QPproblem.c = zeros(nRxnsALT,1);
         QPproblem.c(enzymeIds) = modelREF.ub(enzymeIds);
         QPproblem.c(enzymeIds) = QPproblem.c(enzymeIds)/etotREF;
         QPproblem.c(enzymeIds) = -2*QPproblem.c(enzymeIds);
         
         QPproblem.F = sparse(size(QPproblem.A,2));
-        QPproblem.F(1:nRxnsSTR,1:nRxnsSTR) = speye(nRxnsSTR);
-        QPproblem.F(1:nRxnsSTR,1:nRxnsSTR) = 0;
+        QPproblem.F(1:nRxnsALT,1:nRxnsALT) = speye(nRxnsALT);
+        QPproblem.F(1:nRxnsALT,1:nRxnsALT) = 0;
         QPproblem.F(min(enzymeIds):max(enzymeIds),min(enzymeIds):max(enzymeIds)) = 2*eye(enzymeNum);
         
         QPproblem.osense = 1;
@@ -131,15 +131,15 @@ if MinStr == "Euclidean"
     QPsolution = solveCobraQP(QPproblem);
     
     % Get the solution(s)
-    solutionSTR = QPsolution.full;
-    solutionSTR(enzymeIds) = solutionSTR(enzymeIds) * etotSTR;
+    solutionALT = QPsolution.full;
+    solutionALT(enzymeIds) = solutionALT(enzymeIds) * etotALT;
     
     solStatus = QPsolution.stat;
 
 elseif MinStr == "Manhattan"
     % Construct the LP problem to find ES2
     [~,nRxnsREF] = size(modelREF.S);
-    [~,nRxnsSTR] = size(modelSTR.S);
+    [~,nRxnsALT] = size(modelALT.S);
     enzymeIds = find(~cellfun('isempty',strfind(modelREF.rxnNames,'prot_')));
     [enzymeNum,~] = size(enzymeIds);
     
@@ -147,20 +147,20 @@ elseif MinStr == "Manhattan"
     infBounds = find(isinf(modelREF.ub));
     infBoundsProt = intersect(infBounds, enzymeIds);
     
-    etotShare = etotSTR/infNum;
+    etotShare = etotALT/infNum;
     modelREF.ub(infBoundsProt) = etotShare;
     
     modelDelta = struct();
     
     % Set the lower and upper bounds for the fluxes
-    modelDelta.lb = [modelREF.lb; modelSTR.lb];
+    modelDelta.lb = [modelREF.lb; modelALT.lb];
     modelDelta.lb(modelDelta.lb==-Inf) = -1000;
     
-    modelDelta.ub = [modelREF.ub; modelSTR.ub];
+    modelDelta.ub = [modelREF.ub; modelALT.ub];
     modelDelta.ub(modelDelta.ub==Inf) = 1000;
     
     % Concatenate the stoichiometric matrices and S-matrices of the two models
-    modelDelta.S = [modelREF.S zeros(size(modelREF.S,1), size(modelSTR.S,2)); zeros(size(modelSTR.S,1), size(modelREF.S,2)) modelSTR.S];
+    modelDelta.S = [modelREF.S zeros(size(modelREF.S,1), size(modelALT.S,2)); zeros(size(modelALT.S,1), size(modelREF.S,2)) modelALT.S];
     
     % Set the RHS vector
     modelDelta.b = zeros(size(modelDelta.S,1),1);
@@ -176,20 +176,20 @@ elseif MinStr == "Manhattan"
         modelDelta.c(1:rxns_index) = lambda*NormMinSol.full(1:rxns_index);
         modelDelta.c(enzymeIds) = ones(length(modelREF.rxns(enzymeIds)),1);
         modelDelta.c(enzymeIds) = (NormMinSol.full(enzymeIds)/etotREF);
-        modelDelta.c(enzymeIds_cindex) = -ones(length(modelSTR.rxns(enzymeIds)),1);
+        modelDelta.c(enzymeIds_cindex) = -ones(length(modelALT.rxns(enzymeIds)),1);
     else
         modelDelta.c = zeros(nVars,1);
         modelDelta.c(enzymeIds) = ones(length(modelREF.rxns(enzymeIds)),1);
         modelDelta.c(enzymeIds) = modelDelta.c(enzymeIds)/etotREF;
-        modelDelta.c(enzymeIds_cindex) = -ones(length(modelSTR.rxns(enzymeIds)),1);
+        modelDelta.c(enzymeIds_cindex) = -ones(length(modelALT.rxns(enzymeIds)),1);
     end
     
     % Solve the problem
     LPsolution = solveCobraLP(modelDelta);
     
     % Get the solution(s)
-    solutionSTR = LPsolution.full(length(modelREF.rxns)+1:end);
-    solutionSTR(enzymeIds) = solutionSTR(enzymeIds) * etotSTR;
+    solutionALT = LPsolution.full(length(modelREF.rxns)+1:end);
+    solutionALT(enzymeIds) = solutionALT(enzymeIds) * etotALT;
 
     solStatus = LPsolution.stat;
     
