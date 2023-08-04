@@ -12,6 +12,28 @@ changeCobraSolver('gurobi', 'QP');
 % Constraints for suboptimal conditions
 load('./constraints_Ecoli.mat')
 
+% We need to calculate the total enzyme usage Etot, which is the total
+% protein content Ptot, multiplied by the fraction f of enzymes that are 
+% accounted for in the model, and a parameter sigma, which is the average 
+% in vivo saturation of all enzymes. This is done for both reference and
+% alternative models. For both models, Etot is used to normalize the enzyme
+% usage distributions. For the alternative growth model, Etot is used to
+% constrain the protein pool exchange pseudo-reaction as well.
+%
+% The values of sigma and f can be specified, but in their absence a
+% default of 0.5 is usually assumed. We noticed that 0.5 resulted in 
+% unfeasible solutions. We adopted 0.4 as the default because this was 
+% the value that allowed growth while ensuring that the protein pool 
+% exchange pseudo-reaction was adequately constrained.
+%
+% For all the other parameters used in this code (uptake rates, growth 
+% rates, Ptots, etc), refer to the file "constraints_Ecoli.xlsx".
+%
+% In case a particular growth condition results in unfeasible solutions, we
+% suggest running PARROT for that individual condition, using the function
+% PARROT.m and constraining the model as shown in the examples. The
+% constraints can be found in the file "constraints_Ecoli.xlsx".
+
 ptotREF = 0.61;
 
 f_REF = 0.4;

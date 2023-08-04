@@ -6,11 +6,33 @@
 %% Cleaning the workspace and the command window
 clear;clc
 tic
-changeCobraSolver('ibm_cplex', 'LP');
+changeCobraSolver('gurobi', 'LP');
 
 %% Loading the enzyme-constrained model and other data
 % Constraints for suboptimal conditions
 load('./constraints_Scerevisiae_noref.mat')
+
+% We need to calculate the total enzyme usage Etot, which is the total
+% protein content Ptot, multiplied by the fraction f of enzymes that are 
+% accounted for in the model, and a parameter sigma, which is the average 
+% in vivo saturation of all enzymes. This is done for both reference and
+% alternative models. For both models, Etot is used to normalize the enzyme
+% usage distributions. For the alternative growth model, Etot is used to
+% constrain the protein pool exchange pseudo-reaction as well.
+%
+% The values of sigma and f can be specified, but in their absence a
+% default of 0.5 is usually assumed. We noticed that 0.5 resulted in 
+% unfeasible solutions. We adopted 0.4 as the default because this was 
+% the value that allowed growth while ensuring that the protein pool 
+% exchange pseudo-reaction was adequately constrained.
+%
+% For all the other parameters used in this code (uptake rates, growth 
+% rates, Ptots, etc), refer to the file "constraints_Scerevisiae.xlsx".
+%
+% In case a particular growth condition results in unfeasible solutions, we
+% suggest running PARROT for that individual condition, using the function
+% PARROT.m and constraining the model as shown in the examples. The
+% constraints can be found in the file "constraints_Scerevisiae.xlsx".
 
 %% Loop over growth conditions using Lahtvee2017_REF as reference
 % pcGEM integrated with experimental proteomics for reference condition 
@@ -53,7 +75,7 @@ for k = 1:numel(growth_conditions)
     clear model
 
     % Baseline for calculating comparisons
-    baselinedir = "./Baseline2/Baseline_Norm2_" + current_condition + ".mat";
+    baselinedir = "./Baseline/Baseline_" + current_condition + ".mat";
     load(baselinedir)  
     
     % Constraints for generating VS2
@@ -264,7 +286,7 @@ for k = 1:numel(growth_conditions)
     clear model
 
     % Baseline for calculating comparisons
-    baselinedir = "./Baseline2/Baseline_Norm2_" + current_condition + ".mat";
+    baselinedir = "./Baseline/Baseline_" + current_condition + ".mat";
     load(baselinedir)  
     
     % Constraints for generating VS2
@@ -277,25 +299,23 @@ for k = 1:numel(growth_conditions)
     modelSTR = changeRxnBounds(modelSTR, 'r_1634', flux_values(8), 'u');      % acetate
     modelSTR = changeRxnBounds(modelSTR, 'r_1761_REV', flux_values(9), 'u');   % ethanol
 
-    modelSTR = changeRxnBounds(modelSTR, 'r_1891_REV', flux_values(10), 'u');       % Gln
-    modelSTR = changeRxnBounds(modelSTR, 'r_1903_REV', flux_values(11), 'u');       % Phe
-    modelSTR = changeRxnBounds(modelSTR, 'r_1897_REV', flux_values(12), 'u');       % Ile
+    % modelSTR = changeRxnBounds(modelSTR, 'r_1891_REV', flux_values(10), 'u');       % Gln
+    % modelSTR = changeRxnBounds(modelSTR, 'r_1903_REV', flux_values(11), 'u');       % Phe
+    % modelSTR = changeRxnBounds(modelSTR, 'r_1897_REV', flux_values(12), 'u');       % Ile
 
-    
-
-    % fix specific growth rate at the dilution rate, allowing 5% flexibility
-    modelSTR = changeRxnBounds(modelSTR, 'r_2111', flux_values(1)*(1+0.5), 'u');
-    modelSTR = changeRxnBounds(modelSTR, 'r_2111', flux_values(1)*(1-0.5), 'l');
+    % fix specific growth rate at the dilution rate, allowing flexibility
+    modelSTR = changeRxnBounds(modelSTR, 'r_2111', flux_values(1)*(1+0.05), 'u');
+    modelSTR = changeRxnBounds(modelSTR, 'r_2111', flux_values(1)*(1-0.05), 'l');
 
     ptotSTR = flux_values(13);
 
     etotREF = ptotREF * f_REF * sigma_REF;
     etotSTR = ptotSTR * f_STR * sigma_STR;
 
-    modelSTR = changeRxnBounds(modelSTR, 'prot_pool_exchange', etotSTR, 'b');
+    modelSTR = changeRxnBounds(modelSTR, 'prot_pool_exchange', etotSTR*(1+0.05), 'b');
 
-    modelSTR = FlexibilizeConstraints(modelSTR, 0.5);
-    
+    modelSTR = FlexibilizeConstraints(modelSTR, 0.05);
+  
     % Construct the LP problem to find Es
     [~,nRxnsREF] = size(modelREF.S);
     [~,nRxnsSTR] = size(modelSTR.S);
@@ -305,9 +325,9 @@ for k = 1:numel(growth_conditions)
     infNum = sum(isinf(modelREF.ub(enzymeIds)));
     infBounds = find(isinf(modelREF.ub));
     infBoundsProt = intersect(infBounds, enzymeIds);
-    
+
     etotShare = etotSTR/infNum;
-    modelREF.ub(infBoundsProt) = etotShare;
+    % modelREF.ub(infBoundsProt) = etotShare;
     
     modelDelta = struct();
     
@@ -477,7 +497,7 @@ for k = 1:numel(growth_conditions)
     clear model
 
     % Baseline for calculating comparisons
-    baselinedir = "./Baseline2/Baseline_Norm2_" + current_condition + ".mat";
+    baselinedir = "./Baseline/Baseline_" + current_condition + ".mat";
     load(baselinedir)  
     
     % Constraints for generating VS2
@@ -688,7 +708,7 @@ for k = 1:numel(growth_conditions)
     clear model
 
     % Baseline for calculating comparisons
-    baselinedir = "./Baseline2/Baseline_Norm2_" + current_condition + ".mat";
+    baselinedir = "./Baseline/Baseline_" + current_condition + ".mat";
     load(baselinedir)  
     
     % Constraints for generating VS2
@@ -899,7 +919,7 @@ for k = 1:numel(growth_conditions)
     clear model
 
     % Baseline for calculating comparisons
-    baselinedir = "./Baseline2/Baseline_Norm2_" + current_condition + ".mat";
+    baselinedir = "./Baseline/Baseline_" + current_condition + ".mat";
     load(baselinedir)  
     
     % Constraints for generating VS2
@@ -1112,7 +1132,7 @@ for k = 1:numel(growth_conditions)
     clear model
 
     % Baseline for calculating comparisons
-    baselinedir = "./Baseline2/Baseline_Norm2_" + current_condition + ".mat";
+    baselinedir = "./Baseline/Baseline_" + current_condition + ".mat";
     load(baselinedir)  
     
     % Constraints for generating VS2
