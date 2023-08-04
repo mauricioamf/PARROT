@@ -11,8 +11,8 @@ Constraint-based prediction of protein abundance for alternative conditions
 ## How to run PARROT for your model
 1. Create a pcGEM using the [GECKO toolbox](https://github.com/SysBioChalmers/GECKO)
 2. Integrate protein abundance values for the reference condition in the created pcGEM 
-3. Define the constraints and simulation parameters for the suboptimal condition
-4. Run PARROT to obtain the enzyme usage distribution for your target suboptimal condition
+3. Define the constraints and simulation parameters for the alternative condition
+4. Run PARROT to obtain the enzyme usage distribution for your target alternative condition
 
 | Input | Explanation |
 | :---:         | --- |
@@ -21,8 +21,10 @@ Constraint-based prediction of protein abundance for alternative conditions
 | _MinStr_   | Minimization strategy, 'Euclidean' or 'Manhattan' |
 | _lambda_   | Weighting factor for metabolic fluxes |
 | _etotREF_   | Total enzyme usage for the reference condition |
-| _etotSTR_   | Total enzyme usage for the suboptimal condition |
+| _etotALT_   | Total enzyme usage for the alternative condition |
 
 ## Usage:
-[solutionSTR, solStatus] = PARROT(modelREF, modelSTR, MinStr, lambda, etotREF, etotSTR)
+[solutionALT, solStatus] = PARROT(modelREF, modelALT, MinStr, lambda, etotREF, etotALT)
+
+Refer to 'Example1.m' and 'Example2.m' for additional information on how to run PARROT.
 
